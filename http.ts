@@ -25,12 +25,16 @@ export function badRequest(publicMessage?: string) {
     return withPublicMessage(withStatus(new Error('Bad request'), 400), publicMessage)
 }
 
-/** Please authenticate yourself, e.g. log in or refresh your tokens. */
+/**
+Please authenticate yourself, e.g. log in or refresh your tokens.
+*/
 export function unauthorized() {
     return withStatus(new Error('Unauthorized'), 401)
 }
 
-/** I known who you are; you're not getting in. */
+/**
+I known who you are; you're not getting in.
+*/
 export function forbidden() {
     return withStatus(new Error('Forbidden'), 403)
 }

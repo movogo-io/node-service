@@ -36,7 +36,7 @@ const cron = Symbol()
 function withCron<T extends { schedule: string; [cron]?: CronTime }>(
     handler: T,
 ): T & { [cron]: CronTime } {
-    if (cron in handler) {
+    if (Object.hasOwn(handler, cron)) {
         return handler as T & { [cron]: CronTime }
     }
     handler[cron] = new CronTime(handler.schedule)

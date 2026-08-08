@@ -1,6 +1,6 @@
 {
   "name": "@riddance/service",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "type": "module",
   "license": "MIT",
   "engines": {
@@ -45,17 +45,20 @@
     "instructions": "./instructions.md"
   },
   "dependencies": {
-    "@riddance/host": "0.3.0",
+    "@riddance/host": "0.3.1",
     "cron": "4.4.0",
-    "jose": "6.2.3"
+    "jose": "6.2.8"
   },
   "devDependencies": {
-    "@riddance/env": "0.10.0"
+    "@riddance/env": "0.10.2"
   },
   "scripts": {
     "start": "riddance-watch",
     "prepack": "riddance-build",
     "prepublishOnly": "riddance-prepublish",
     "postpublish": "riddance-sync"
+  },
+  "allowScripts": {
+    "@riddance/env": true
   }
 }

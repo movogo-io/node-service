@@ -63,6 +63,7 @@ export const mochaHooks = {
         if (testContext) {
             throw new Error('Context exists.')
         }
+        // eslint-disable-next-line unicorn/no-top-level-assignment-in-function
         testContext = new TestContext(env)
     },
 
@@ -85,6 +86,7 @@ export const mochaHooks = {
                 }
             }
         }
+        // eslint-disable-next-line unicorn/no-top-level-assignment-in-function
         testContext = undefined
     },
 }
@@ -139,10 +141,10 @@ export function getTestContext(): TestContext {
 }
 
 class MockLogger implements LogTransport {
-    #entries: LogEntry[] = []
-    readonly #startTime = Math.round(performance.now() * 10_000)
     failOnErrorLogs = true
     failed = false
+    #entries: LogEntry[] = []
+    readonly #startTime = Math.round(performance.now() * 10_000)
 
     getEntries() {
         return [...this.#entries]
@@ -162,31 +164,27 @@ class MockLogger implements LogTransport {
         return undefined
     }
 
-    #msSinceStart(entry: LogEntry) {
-        return (Math.round(entry.timestamp * 10_000) - this.#startTime) / 10_000
-    }
-
     async dumpLog(testTitle: string) {
-        if (this.#entries.length !== 0) {
-            const p = this.writeLog()
-            const errors = this.#entries.filter(e => e.level === 'fatal' || e.level === 'error')
-            if (errors.length !== 0) {
-                console.error(testTitle + ' error log:')
-                errors.forEach(e => {
-                    console.error(
-                        `@${this.#msSinceStart(e)}ms ${levelString(e.level)} ${e.message}`,
-                    )
-                    if (e.error) {
-                        console.error(e.error)
-                    }
-                })
+        if (this.#entries.length === 0) {
+            return
+        }
+
+        const p = this.writeLog()
+        const errors = this.#entries.filter(e => e.level === 'fatal' || e.level === 'error')
+        if (errors.length !== 0) {
+            console.error(testTitle + ' error log:')
+            for (const e of errors) {
+                console.error(`@${this.#msSinceStart(e)}ms ${levelString(e.level)} ${e.message}`)
+                if (e.error) {
+                    console.error(e.error)
+                }
             }
-            const logFile = await p
-            if (logFile) {
-                console.info(
-                    `Full log of "${testTitle}" saved to .${sep}${relative(process.env.PROJECT_DIRECTORY ?? process.cwd(), logFile)}`,
-                )
-            }
+        }
+        const logFile = await p
+        if (logFile) {
+            console.info(
+                `Full log of "${testTitle}" saved to .${sep}${relative(process.env.PROJECT_DIRECTORY ?? process.cwd(), logFile)}`,
+            )
         }
     }
 
@@ -218,16 +216,20 @@ class MockLogger implements LogTransport {
             console.error(`Error saving log:`)
             console.error(e)
             console.log('Full log:')
-            this.#entries.forEach(entry => {
+            for (const entry of this.#entries) {
                 console.log(
                     `@${this.#msSinceStart(entry)}ms ${levelString(entry.level)} ${entry.message}`,
                 )
                 if (entry.error) {
                     console.log(entry.error)
                 }
-            })
+            }
             return undefined
         }
+    }
+
+    #msSinceStart(entry: LogEntry) {
+        return (Math.round(entry.timestamp * 10_000) - this.#startTime) / 10_000
     }
 }
 
@@ -246,7 +248,7 @@ function levelString(level: LogLevel) {
         case 'fatal':
             return '[FATAL]  '
         default:
-            return '         '
+            return ' '.repeat(9)
     }
 }
 
@@ -260,12 +262,8 @@ type Event = {
 
 class TestContext {
     readonly log: MockLogger
-
-    get env() {
-        return this.environment
-    }
-
     environment: { [key: string]: string }
+
     emitted: Event[] = []
 
     frozenTime: number | undefined
@@ -282,6 +280,9 @@ class TestContext {
         this.log = new MockLogger()
     }
 
+    get env() {
+        return this.environment
+    }
     now(): Date {
         if (this.frozenTime !== undefined) {
             return new Date(this.frozenTime + this.timeShift * 1000)

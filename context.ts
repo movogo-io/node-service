@@ -15,20 +15,22 @@ export type Stringified<T> = T extends null | boolean | number | string
             : T extends { toJSON: (...args: unknown[]) => infer U }
               ? Stringified<U>
               : // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type, @typescript-eslint/no-restricted-types
-                T extends { toJSON: Function } | Map<infer _, infer _> | Set<infer _>
+                T extends Map<infer _, infer _> | Set<infer _> | { toJSON: Function }
                 ? object
                 : T extends readonly (infer U)[]
                   ? Stringified<U extends undefined ? null : U>[]
                   : T extends object
                     ? {
-                          // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type, @typescript-eslint/no-restricted-types
-                          [K in keyof T as T[K] extends Function | symbol
-                              ? never
-                              : Stringified<T[K]> extends never
-                                ? never
-                                : K extends symbol
+                          [
+                              // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type, @typescript-eslint/no-restricted-types
+                              K in keyof T as T[K] extends Function | symbol
                                   ? never
-                                  : K]: Stringified<T[K]>
+                                  : Stringified<T[K]> extends never
+                                    ? never
+                                    : K extends symbol
+                                      ? never
+                                      : K
+                          ]: Stringified<T[K]>
                       }
                     : never
 

@@ -139,7 +139,7 @@ const pathRegExp = Symbol()
 function withPathRegExp<T extends { pathPattern: string; [pathRegExp]?: RegExp }>(
     handler: T,
 ): T & { [pathRegExp]: RegExp } {
-    if (pathRegExp in handler) {
+    if (Object.hasOwn(handler, pathRegExp)) {
         return handler as T & { [pathRegExp]: RegExp }
     }
     handler[pathRegExp] = pathToRegExp(handler.pathPattern)
