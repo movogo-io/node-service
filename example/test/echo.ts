@@ -1,4 +1,4 @@
-import { request } from '@riddance/service/test/http'
+import { request } from '@movogo-io/service/test/http'
 import assert from 'node:assert/strict'
 
 describe('echo', () => {

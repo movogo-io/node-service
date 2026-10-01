@@ -32,11 +32,11 @@ There are three types of entrypoints:
 This example shows the features of HTTP request handling entrypoints:
 
 ```ts
-import { badRequest, forbidden, get, getBearer, objectSpreadable } from "@riddance/service/http";
+import { acceptForwardedAttribution, badRequest, forbidden, get, getBearer, objectSpreadable } from "@movogo-io/service/http";
 
 // get is the method, it can also be `put`, `post`, and `delete`. First argument is the path. It can contain `*` as a single segment wildcard, or end in `**` to match any number of segments.
 get("users/*/profile", async (context, request) => {
-    // `getBearer` takes the JWT bearer token for the current request, verifies and unpacks it. It will throw `unauthorized` if it can't, so the code following it can assume there is a correctly signed bearer token. `getBearer` returns parsed JSON, which TypeScript doesn't know. `objectSpreadable` is a no-op function that tells TypeScript that it is safe to spread the JSON into an object whose values will also be parsed JSON. If the JSON is in fact a number or a boolean, the spread will work, but be empty. There is a similar function called `arraySpreadable` allows spreading JSON that is an array into an array.
+    // `getBearer` takes the JWT bearer token for the current request, verifies and unpacks it. It will throw `unauthorized` if it can't, so the code following it can assume there is a correctly signed bearer token. `getBearer` returns parsed JSON, which TypeScript doesn't know. `objectSpreadable` is a no-op function that tells TypeScript that it is safe to spread the JSON into an object whose values will also be parsed JSON. If the JSON is in fact a number or a boolean, the spread will work, but be empty. There is a similar function called `arraySpreadable` allows spreading JSON that is an array into an array. When the verified token carries both `sub` and `org`, `getBearer` also records `context.attribution.onBehalfOf = { userId: sub, org }`, which rides along on `httpRequestHeaders` and emitted events as attribution (never authorization: keep checking `sub` and `scope` here). A request to a bearer route carrying any `x-on-behalf-of-*` header is answered 400 before the token is looked at.
     const { sub, scope } = objectSpreadable(await getBearer(context, request));
     // Make sure to weed out error cases in the beginning
     if (typeof sub !== "string") {
@@ -51,6 +51,8 @@ get("users/*/profile", async (context, request) => {
     if (request.headers["api-key"] !== context.env.API_KEY) {
         throw forbidden();
     }
+    // On an API-key route called by one of our own services, accept the caller's `x-on-behalf-of-user-id` / `x-on-behalf-of-org` headers into `context.attribution` so the user they act for stays attached to what this handler emits and requests. Call it right after the api-key check, never before. It is attribution, never authorization: do not read it to decide what the request may do.
+    acceptForwardedAttribution(context, request);
     // request.url is a standard URL
     const query = request.url.searchParams.get("q");
     if (query === null) {
@@ -77,7 +79,7 @@ get("users/*/profile", async (context, request) => {
 These endpoints are tested in files with the same name in the test directory using mocha like this:
 
 ```ts
-import { allowErrorLogs, getEnvironment, request, withBearer } from "@riddance/service/test/http";
+import { allowErrorLogs, getEnvironment, request, withBearer } from "@movogo-io/service/test/http";
 import { randomUUID } from "node:crypto";
 import assert from "node:assert/strict";
 
@@ -171,7 +173,7 @@ HTTP requests can time out as seen from the client. If they do, clients will ret
 Event handlers are used for asynchronous processing in a publish/subscribe event driven architecture. Assume the delivery is at-least-once, so it needs to be idempotent if feasible. Any unhandled exceptions will trigger a retry. This example shows the features of entrypoints used to handle events:
 
 ```ts
-import { objectSpreadable, on } from "@riddance/service/event";
+import { objectSpreadable, on } from "@movogo-io/service/event";
 
 // Setup the handler using the `on` function. First argument is the topic to handle, typically a noun, the second is the type, typically a verb in past tense indicating what happened to the topic. In addition to the context (see below), the handler is passed a subject which is the ID of the entity in the topic this event is about, the `event` it self with is a parsed JSON object with data about the event, the `timestamp` which is the time the event occurred, and a `messageId` which is the ID of the event, which can be used to track duplicates. The latter two are rarely used, and sometime the event has no data in which case `event` is also not used.
 on("account", "locked", (context, subject, event, timestamp, messageId) => {
@@ -183,12 +185,12 @@ on("account", "locked", (context, subject, event, timestamp, messageId) => {
 These endpoints are tested in files with the same name in the test directory using mocha like this:
 
 ```ts
-import { emit } from "@riddance/service/test/event";
+import { emit } from "@movogo-io/service/test/event";
 import { randomUUID } from "node:crypto";
 
 describe("account locked", () => {
     it("should keep quite", async () => {
-        // Event handlers are triggered using the `emit` function which takes arguments matching the `on` handler registration function.
+        // Event handlers are triggered using the `emit` function which takes arguments matching the `on` handler registration function: `emit(topic, type, subject, data?, messageId?, { attributes?, onBehalfOf? })`. Handlers with a filter are matched like the bus matches them, on `attributes`. `emit` returns false, with one warning logged, when every handler for the topic and type was excluded by its filter, and true when no handler listens at all.
         await emit("account", "locked", randomUUID(), {
             what: new Date(),
         });
@@ -206,7 +208,7 @@ If for some reason processing an event takes a long time, the same events may be
 Scheduled jobs allow code to run regularly on a schedule without any explicit trigger. Any unhandled exceptions will not trigger a retry, but the handler will be triggered again at the next scheduled time. As such, it does not make sense for them to be idempotent. This example shows the features of entrypoints running on a schedule:
 
 ```ts
-import { setInterval } from "@riddance/service/timer";
+import { setInterval } from "@movogo-io/service/timer";
 
 // Setup the handler using the `setInterval` function. The first argument is the CRON schedule, the second argument is the handler. The handler is passed the time it was triggered matching the CRON expression. Here, the handler is triggered every hour on the hour.
 setInterval("0 */1 * * *", async (context, { triggerTime }) => {
@@ -217,7 +219,7 @@ setInterval("0 */1 * * *", async (context, { triggerTime }) => {
 These endpoints are tested in files with the same name in the test directory using mocha like this:
 
 ```ts
-import { clockStrikes } from "@riddance/service/test/timer";
+import { clockStrikes } from "@movogo-io/service/test/timer";
 
 describe("scheduled jobs", () => {
     it("should keep quite", async () => {
@@ -238,6 +240,7 @@ All entrypoint callbacks are provided a `context`. You can use it as follows:
 async (context) => {
     // Publish events. Here the 'locked' event is published on the 'account' topic with subject userId and data { reason: 'rate-limit' }. Only emit events when asked to, as they typically interact with the entire system.
     await context.emit("account", "locked", userId, { reason: "rate-limit" });
+    // The full signature is `emit(topic, type, subject, data?, messageId?, attributes?)`. `attributes` are exact strings consumers filter on, put beside the event, not in it: at most four, names matching `^[a-z][A-Za-z0-9]{0,63}$` and none of the reserved `operationId`, `clientId`, `clientIp`, `clientPort`, `userAgent`, `content-encoding`, `onBehalfOfUserId`, `onBehalfOfOrg` or anything starting with `AWS.` / `Amazon.`; values non-empty, at most 256 characters, no control characters. The subject is non-empty, under 100 characters, without line breaks or control characters. Emit throws before anything is sent when a rule is broken. Do not invent attributes for announcements: the contract package's helpers supply them.
 
     // Log using `context.log`. All handlers come with built-in begin and end logging with all necessary context, as well as built-in logging of uncaught exceptions, so it's very you need to do this. Include the error as-is from the catch clause as the second argument if you have it, otherwise pass undefined. The third argument is arbitrary structured data that will be attached to the log entry. Use level "trace" for frequent logging, "debug" for entries that may be useful for debugging, "info" for status updates in long running processes, "warn" to call attention to things that are odd but may directly cause an error, and "error" if something has gone wrong. Do not log and rethrow, since uncaught errors are logged automatically, so only catch and log errors if you need to proceed with other things afterwards.
     context.log.warn("Something odd.", new Error("Error message"), { extra: "structured data" });
@@ -248,7 +251,7 @@ async (context) => {
     // Note that BASE_URL variables end in a slash, so they can be concatenated with relative paths
     await fetch(context.env.SERVICE_BASE_URL + "?q=stuff", {
         headers: {
-            // When requesting **our own endpoints**, include the headers from `httpRequestHeaders`. This will pass along information such as client ID, request ID, user agent, IP address, etc.
+            // When requesting **our own endpoints**, include the headers from `httpRequestHeaders`. This will pass along information such as client ID, user agent, IP address, always an `x-request-id` (the operation id minted for this invocation, which every response also echoes as `x-request-id`), and `x-on-behalf-of-user-id` / `x-on-behalf-of-org` when `context.attribution.onBehalfOf` is set.
             ...httpRequestHeaders(context),
 
             // **DO NOT** use `httpRequestHeaders` when requesting **endpoints not owned by us**. Instead, pass **only** a user agent:
@@ -259,6 +262,25 @@ async (context) => {
     });
 };
 ```
+
+### Filtering events
+
+A handler that only wants some of a topic's events declares a filter in its configuration, and the bus delivers only events whose attributes match: every key of the filter present on the event with a value strictly equal to one of the listed values. Exact strings only, one to five keys, distinct values, at most 150 combinations.
+
+```ts
+import { on } from "@movogo-io/service/event";
+// Requires `@movogo-io/contract` 0.6.0 or later, which ships the filter helpers in its `schema` entry.
+import { announcementFilter } from "@movogo-io/contract/schema";
+// The `announcements` entries come from the producer's documents package, the same entries `followChanges` takes.
+import { announcements as rentals } from "@movogo-io/rentals-documents";
+
+// Take the filter from the contract package's helpers (`announcementFilter(...entries)` over the `announcements` entries of the resources followed, `actionFilter(entry, actions)` for one resource's audited actions, which is lossy as the contract package's instructions explain), never spell attribute names by hand. A service on a contract older than 0.6.0 spells the one documented shape, `{ filter: { resource: ["rental"] } }`, and a reviewer checks it against the announcing service's registry.
+on("document", "changed", { filter: announcementFilter(rentals.rental) }, async (context, subject, event) => {
+    // ...
+});
+```
+
+A filter change takes up to 15 minutes to propagate after a deploy, and selection is not correctness: the handler still checks the event and discards what it does not handle.
 
 ### Utilities
 
@@ -284,12 +306,13 @@ You can interact with the context from tests like this:
 ```ts
 import {
     getEmitted,
+    getEmittedEnvelopes,
     getLoggedEntries,
     setEnvironment,
     timeShift,
     timeShiftTo,
     // replace 'http' with 'event' or 'timer' if that's the kind of service you're testing
-} from "@riddance/service/test/http";
+} from "@movogo-io/service/test/http";
 
 // Get the entries that was logged so far during the test using `getLoggedEntries()`
 assert.deepStrictEqual(
@@ -311,6 +334,17 @@ assert.deepStrictEqual(getEmitted(), [
         },
     },
 ]);
+// `getEmittedEnvelopes()` shows what went beside each event: the emitter's attributes (`{}` when none) and the attribution the context carried (`undefined` when none). `messageId` is what the emitter passed, which production never carries; the id a consumer sees is the bus's.
+assert.deepStrictEqual(getEmittedEnvelopes(), [
+    {
+        topic: "account",
+        type: "locked",
+        subject: userId,
+        messageId: undefined,
+        attributes: {},
+        onBehalfOf: { userId: "its me", org: "acme" },
+    },
+]);
 
 // Set the wall-clock time reported by `context.now()` using **time shift**. Shift it forward five seconds like this
 timeShift(5);
@@ -324,6 +358,8 @@ setEnvironment({ SERVICE_BASE_URL: `http://localhost:${port}/` });
 ```
 
 Remember, tests will automatically fail if errors are logged, so there's no need to assert that `getLoggedEntries()`is free of errors.
+
+The test run refuses to start when `package-lock.json` installs more than one host (`@riddance/host` beside `@movogo-io/host`, at the top level or nested under a dependency): the entrypoints would register in one host instance while the mock and the platform packages run through the other, and the attribution the other `getBearer` sets would silently be missing. Pin `@movogo-io/service` together with the platform packages that peer `@movogo-io/host`, never one without the other. The deploy refuses the same lockfile when it stages.
 
 If a handler does a fetch to **endpoints not owned by us**, consider using creating a helper mock server using Nodejs' built-in `createServer` in the `node:http` module and use environment variable to direct the handler to hit that mock, and use it in all relevant tests. Put such mocks at the bottom of the test files that need them. For **our own endpoints** and public external endpoints that doesn't mutate anything, just let the fetch run as-is against an already deployed service configured in env.txt. Ask if you do not know where it's deployed.
 

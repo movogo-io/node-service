@@ -1,5 +1,5 @@
-import { getHandlers } from '@riddance/host/registry'
-import { triggerTimer } from '@riddance/host/timer'
+import { getHandlers } from '@movogo-io/host/registry'
+import { triggerTimer } from '@movogo-io/host/timer'
 import { CronTime } from 'cron'
 import { createMockContext } from './setup.js'
 

@@ -1,6 +1,6 @@
 {
-  "name": "@riddance/service",
-  "version": "0.3.1",
+  "name": "@movogo-io/service",
+  "version": "0.4.0",
   "type": "module",
   "publishConfig": {
     "registry": "https://npm.pkg.github.com"
@@ -52,7 +52,7 @@
     "instructions": "./instructions.md"
   },
   "dependencies": {
-    "@riddance/host": "0.3.1",
+    "@movogo-io/host": "0.4.0",
     "cron": "4.4.0",
     "jose": "6.2.8"
   },

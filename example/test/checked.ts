@@ -1,4 +1,4 @@
-import { allowErrorLogs, request } from '@riddance/service/test/http'
+import { allowErrorLogs, request } from '@movogo-io/service/test/http'
 import assert from 'node:assert/strict'
 
 describe('checked', () => {

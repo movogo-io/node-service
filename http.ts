@@ -1,7 +1,8 @@
-import { Context, Json } from './context.js'
+import { claim } from '@movogo-io/host/attribution'
+import { Context, Json, objectSpreadable } from './context.js'
 import { verify } from './lib/jwt.js'
 
-export * from '@riddance/host/lib/http'
+export * from '@movogo-io/host/lib/http'
 export * from './context.js'
 
 /*@__INLINE__*/
@@ -47,10 +48,17 @@ export function notImplemented() {
     return withStatus(new Error('Not implemented'), 501)
 }
 
-/*@__NO_SIDE_EFFECTS__*/ export async function getBearer(
+// Not annotated @__NO_SIDE_EFFECTS__: it sets the attribution claim and throws 400/401, so a
+// call made only to authenticate must survive tree-shaking.
+export async function getBearer(
     context: Context,
-    req: { headers: { authorization?: string } },
+    req: { headers: { readonly [key: string]: string | undefined } },
 ): Promise<Json> {
+    // A bearer route never accepts forwarded attribution; the claim comes from the verified token.
+    // Case-insensitive: API Gateway's REST payload and the test mock keep header names as sent.
+    if (Object.keys(req.headers).some(name => name.toLowerCase().startsWith('x-on-behalf-of-'))) {
+        throw badRequest()
+    }
     const key = context.env.BEARER_PUBLIC_KEY
     if (!key) {
         throw new Error('Please set the BEARER_PUBLIC_KEY environment variable to extract bearer.')
@@ -59,12 +67,20 @@ export function notImplemented() {
     if (!authHeader?.startsWith('Bearer ')) {
         throw unauthorized()
     }
+    let payload: Json
     try {
         const token = authHeader.slice('Bearer '.length)
         const certificate = '-----BEGIN PUBLIC KEY-----\n' + key + '\n-----END PUBLIC KEY-----'
-        return await /*@__PURE__*/ verify(token, certificate)
+        payload = await /*@__PURE__*/ verify(token, certificate)
     } catch (e) {
         context.log.debug('Error verifying jwt.', e)
         throw unauthorized()
     }
+    const { sub, org } = objectSpreadable(payload)
+    if (typeof sub === 'string' && sub !== '' && typeof org === 'string' && org !== '') {
+        // The holder is shared by every copy of the context, so setting it here is enough.
+        const { attribution } = context
+        attribution.onBehalfOf = claim(sub, org)
+    }
+    return payload
 }

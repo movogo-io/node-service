@@ -1,4 +1,11 @@
-import { freezeTime, getEmitted, getLoggedEntries, request } from '@riddance/service/test/http'
+import {
+    allowErrorLogs,
+    freezeTime,
+    getEmitted,
+    getEmittedEnvelopes,
+    getLoggedEntries,
+    request,
+} from '@movogo-io/service/test/http'
 import assert from 'node:assert/strict'
 
 describe('greeting', () => {
@@ -30,5 +37,25 @@ describe('greeting', () => {
                 },
             },
         ])
+        assert.deepStrictEqual(getEmittedEnvelopes(), [
+            {
+                topic: 'greeting',
+                type: 'sent',
+                subject: 'anonymous',
+                messageId: undefined,
+                attributes: { lang: 'en' },
+                onBehalfOf: undefined,
+            },
+        ])
+    })
+
+    it('should refuse a reserved attribute name', async () => {
+        using _ = allowErrorLogs()
+        const response = await request({ uri: `greeting/step?who=world&bad=1` })
+
+        assert.strictEqual(response.status, 500)
+        assert.deepStrictEqual(response.body, undefined)
+        assert.deepStrictEqual(getEmitted(), [])
+        assert.deepStrictEqual(getEmittedEnvelopes(), [])
     })
 })

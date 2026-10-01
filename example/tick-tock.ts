@@ -1,7 +1,7 @@
-import { setInterval } from '@riddance/service/timer'
+import { setInterval } from '@movogo-io/service/timer'
 
 setInterval('0 */1 * * *', async (context, { triggerTime }) => {
-    await context.emit('', '', '')
+    await context.emit('clock', 'struck', 'clock')
     if (triggerTime.getHours() % 2) {
         context.log.info('Tock')
     } else {

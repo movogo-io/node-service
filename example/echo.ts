@@ -1,4 +1,4 @@
-import { objectSpreadable, post } from '@riddance/service/http'
+import { objectSpreadable, post } from '@movogo-io/service/http'
 
 post('echo/*', (_, request) => {
     const { now } = objectSpreadable(request.body)

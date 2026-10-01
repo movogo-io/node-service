@@ -1,4 +1,4 @@
-import { clockStrikes, getLoggedEntries } from '@riddance/service/test/timer'
+import { clockStrikes, getLoggedEntries } from '@movogo-io/service/test/timer'
 import assert from 'node:assert/strict'
 
 describe('tick-tock', () => {

@@ -1,6 +1,6 @@
-import type { Json, JsonObject, JsonSafe, JsonSafeObject } from '@riddance/host/lib/context'
+import type { Json, JsonObject, JsonSafe, JsonSafeObject } from '@movogo-io/host/lib/context'
 
-export * from '@riddance/host/lib/context'
+export * from '@movogo-io/host/lib/context'
 
 export type Stringified<T> = T extends null | boolean | number | string
     ? T

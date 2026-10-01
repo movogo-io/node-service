@@ -1,6 +1,12 @@
 /* eslint-disable no-console */
-import { ClientInfo, createContext, LogEntry, LogLevel, LogTransport } from '@riddance/host/context'
-import { FullConfiguration, Metadata, setMeta } from '@riddance/host/registry'
+import {
+    ClientInfo,
+    createContext,
+    LogEntry,
+    LogLevel,
+    LogTransport,
+} from '@movogo-io/host/context'
+import { FullConfiguration, Metadata, setMeta } from '@movogo-io/host/registry'
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises'
 import { EOL } from 'node:os'
 import { basename, extname, join, relative, sep } from 'node:path'
@@ -9,6 +15,8 @@ import { pathToFileURL } from 'node:url'
 import {
     Environment,
     JsonSafeObject,
+    type Attribution,
+    type EventAttributes,
     type JsonObject,
     type JsonSafe,
     type Stringified,
@@ -34,6 +42,29 @@ async function readEnv() {
     }
 }
 
+async function assertSingleHost() {
+    let lockText: string
+    try {
+        lockText = await readFile('package-lock.json', 'utf-8')
+    } catch (e) {
+        if ((e as { code?: string }).code === 'ENOENT') {
+            return
+        }
+        throw e
+    }
+    const { packages } = JSON.parse(lockText) as { packages?: { [path: string]: unknown } }
+    // Nested too: npm puts a second copy under a dependency when the hoisted one does not
+    // satisfy its peer range, and that copy is as much a second registry as a top-level one.
+    const hosts = Object.keys(packages ?? {}).filter(path => hostPathPattern.test(path))
+    if (hosts.length > 1) {
+        throw new Error(
+            `More than one host installed (${hosts.join(', ')} in package-lock.json): the entrypoints register in one host instance while the mock and the platform packages run through another, and the attribution the other getBearer sets is silently missing. Pin @movogo-io/service together with the platform packages that peer @movogo-io/host, so one host is installed.`,
+        )
+    }
+}
+
+const hostPathPattern = /(^|\/)node_modules\/@(riddance|movogo-io)\/host$/u
+
 async function readConfig() {
     const packageJson = JSON.parse(await readFile('package.json', 'utf-8')) as {
         name: string
@@ -46,6 +77,7 @@ let testContext: TestContext | undefined
 
 export const mochaHooks = {
     async beforeAll() {
+        await assertSingleHost()
         const { name, config } = await readConfig()
         const dir = process.cwd()
         const files = (await readdir('.')).filter(
@@ -99,7 +131,12 @@ export function jsonRoundtrip<T extends JsonSafe>(obj: T | undefined): Stringifi
     return JSON.parse(JSON.stringify(obj)) as Stringified<T>
 }
 
-export function createMockContext(client: ClientInfo, config?: FullConfiguration, meta?: Metadata) {
+export function createMockContext(
+    client: ClientInfo,
+    config?: FullConfiguration,
+    meta?: Metadata,
+    attribution?: Attribution,
+) {
     const ctx = getTestContext()
     return createContext(
         client,
@@ -112,6 +149,7 @@ export function createMockContext(client: ClientInfo, config?: FullConfiguration
                 data: JsonSafeObject | undefined,
                 messageId: string | undefined,
                 signal: AbortSignal,
+                extras?: { attributes?: EventAttributes; attribution?: Attribution },
             ) {
                 signal.throwIfAborted()
                 ctx.emitted.push({
@@ -120,6 +158,19 @@ export function createMockContext(client: ClientInfo, config?: FullConfiguration
                     subject,
                     data: jsonRoundtrip(data),
                     messageId,
+                })
+                const onBehalfOf = extras?.attribution?.onBehalfOf
+                ctx.envelopes.push({
+                    topic,
+                    type,
+                    subject,
+                    messageId,
+                    attributes: { ...extras?.attributes },
+                    onBehalfOf:
+                        onBehalfOf &&
+                        (onBehalfOf.org === undefined
+                            ? { userId: onBehalfOf.userId }
+                            : { userId: onBehalfOf.userId, org: onBehalfOf.org }),
                 })
                 return Promise.resolve()
             },
@@ -130,6 +181,7 @@ export function createMockContext(client: ClientInfo, config?: FullConfiguration
         meta,
         ctx.env,
         () => ctx.now(),
+        attribution,
     )
 }
 
@@ -260,11 +312,21 @@ type Event = {
     messageId: string | undefined
 }
 
+export type Envelope = {
+    topic: string
+    type: string
+    subject: string
+    messageId: string | undefined
+    attributes: { [name: string]: string }
+    onBehalfOf: { userId: string; org?: string } | undefined
+}
+
 class TestContext {
     readonly log: MockLogger
     environment: { [key: string]: string }
 
     emitted: Event[] = []
+    envelopes: Envelope[] = []
 
     frozenTime: number | undefined
     timeShift = 0

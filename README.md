@@ -20,14 +20,14 @@ with as little code as possible.
 Simply run
 
 ```sh
-$ npm install @riddance/service
+$ npm install @movogo-io/service
 ```
 
 Drop a `.ts` file in the directory, e.g.
 
 ```ts
 // greeting.ts
-import { get } from "@riddance/service/http";
+import { get } from "@movogo-io/service/http";
 
 get("greeting", (context, request) => {
     return {
@@ -40,7 +40,7 @@ and a correspoding file in a `test` subdirectory:
 
 ```ts
 // test/greeting.ts
-import { request } from "@riddance/service/test/http";
+import { request } from "@movogo-io/service/test/http";
 import assert from "node:assert/strict";
 
 describe("greeting", () => {
@@ -68,7 +68,7 @@ To deploy it to your favorite cloud provider, create a `../glue/glue.json` file:
 and run
 
 ```sh
-$ npx @riddance/deploy test
+$ npx @movogo-io/deploy@0.3.0 test
 ```
 
 It'll end it's output with something like

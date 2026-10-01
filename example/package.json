@@ -10,6 +10,6 @@
     "start": "riddance-watch"
   },
   "dependencies": {
-    "@riddance/service": "../"
+    "@movogo-io/service": "../"
   }
 }
