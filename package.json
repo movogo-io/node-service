@@ -1,6 +1,6 @@
 {
   "name": "@movogo-io/service",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "type": "module",
   "publishConfig": {
     "registry": "https://npm.pkg.github.com"
@@ -28,7 +28,7 @@
     "./lib/*.js",
     "./mock/*.js",
     "./mock/*.d.ts",
-    "instructions.md"
+    "ai/*.md"
   ],
   "sideEffects": [
     "./context.js",
@@ -49,7 +49,30 @@
   },
   "mock": "test/mock",
   "ai": {
-    "instructions": "./instructions.md"
+    "instructions": "./ai/core.md",
+    "core": "./ai/core.md",
+    "topics": [
+      {
+        "name": "http",
+        "file": "./ai/http.md",
+        "when": "Writing or changing an HTTP entrypoint or its test: get/put/patch/post/del, wildcards, request and response shapes, getBearer, acceptForwardedAttribution, error helpers, request() and withBearer in tests, methods and paths."
+      },
+      {
+        "name": "events-and-timers",
+        "file": "./ai/events-and-timers.md",
+        "when": "Writing or changing an event handler (on) or a scheduled job (setInterval), or their tests with emit and clockStrikes."
+      },
+      {
+        "name": "context",
+        "file": "./ai/context.md",
+        "when": "Using the handler context: context.emit and its attributes, context.log levels, context.now, context.env, httpRequestHeaders, event filters on on(), objectSpreadable, arraySpreadable, missing."
+      },
+      {
+        "name": "testing",
+        "file": "./ai/testing.md",
+        "when": "Asserting what a handler emitted or logged, moving the clock or setting environment variables in a test: getEmitted, getEmittedEnvelopes, getLoggedEntries, timeShift, freezeTime, setEnvironment, mocking a provider."
+      }
+    ]
   },
   "dependencies": {
     "@movogo-io/host": "0.4.0",
