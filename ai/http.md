@@ -133,6 +133,30 @@ OTHER_SERVICE_API_KEY=some-key
 
 HTTP requests can time out as seen from the client. If they do, clients will retry, so the entrypoints need to be idempotent. For getting and updating resources, consider adding a `revision` number that is incremented on update, in order to track the order of updates.
 
+## Raw bodies
+
+A webhook signed with an HMAC over the bytes the sender sent cannot be verified against a parsed body, since re-serialized JSON loses the sender's whitespace and key order. `rawBody: true` hands the handler the body unparsed, as `string | undefined`:
+
+```ts
+import { forbidden, post } from "@movogo-io/service/http";
+import { createHmac, timingSafeEqual } from "node:crypto";
+
+post("signed", { rawBody: true }, (context, request) => {
+    if (typeof request.body !== "string") {
+        throw forbidden();
+    }
+    const expected = createHmac("sha256", context.env.KEY ?? "").update(request.body).digest();
+    const actual = Buffer.from(request.headers["x-signature"] ?? "", "hex");
+    if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) {
+        throw forbidden();
+    }
+    const event: unknown = JSON.parse(request.body);
+    // ...
+});
+```
+
+In tests, send the exact signed string with `body`. A `json` option reaches a raw-body handler as `JSON.stringify` of it, so the handler sees the same shape as in production.
+
 ## Methods and paths
 
 - `get`: for side-effect free reads. Get a list of resources with path `bananas`, get a single resource with path `bananas/*` where the last segment is the ID.

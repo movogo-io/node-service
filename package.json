@@ -55,7 +55,7 @@
       {
         "name": "http",
         "file": "./ai/http.md",
-        "when": "Writing or changing an HTTP entrypoint or its test: get/put/patch/post/del, wildcards, request and response shapes, getBearer, acceptForwardedAttribution, error helpers, request() and withBearer in tests, methods and paths."
+        "when": "Writing or changing an HTTP entrypoint or its test: get/put/patch/post/del, wildcards, request and response shapes, rawBody for signed webhooks, getBearer, acceptForwardedAttribution, error helpers, request() and withBearer in tests, methods and paths."
       },
       {
         "name": "events-and-timers",
@@ -75,7 +75,7 @@
     ]
   },
   "dependencies": {
-    "@movogo-io/host": "0.4.0",
+    "@movogo-io/host": "0.5.0",
     "cron": "4.4.0",
     "jose": "6.2.8"
   },
