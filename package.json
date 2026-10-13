@@ -1,6 +1,6 @@
 {
   "name": "@movogo-io/service",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "type": "module",
   "publishConfig": {
     "registry": "https://npm.pkg.github.com"
@@ -75,7 +75,7 @@
     ]
   },
   "dependencies": {
-    "@movogo-io/host": "0.5.0",
+    "@movogo-io/host": "0.5.1",
     "cron": "4.4.0",
     "jose": "6.2.8"
   },
