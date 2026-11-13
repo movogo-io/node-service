@@ -53,15 +53,22 @@ export function notImplemented() {
 export async function getBearer(
     context: Context,
     req: { headers: { readonly [key: string]: string | undefined } },
+    options?: { publicKeyVariable: string },
 ): Promise<Json> {
     // A bearer route never accepts forwarded attribution; the claim comes from the verified token.
     // Case-insensitive: API Gateway's REST payload and the test mock keep header names as sent.
     if (Object.keys(req.headers).some(name => name.toLowerCase().startsWith('x-on-behalf-of-'))) {
         throw badRequest()
     }
-    const key = context.env.BEARER_PUBLIC_KEY
+    const publicKeyVariable = options?.publicKeyVariable ?? 'BEARER_PUBLIC_KEY'
+    // An inherited name such as `constructor` is not a setting.
+    const key = Object.hasOwn(context.env, publicKeyVariable)
+        ? context.env[publicKeyVariable]
+        : undefined
     if (!key) {
-        throw new Error('Please set the BEARER_PUBLIC_KEY environment variable to extract bearer.')
+        throw new Error(
+            `Please set the ${publicKeyVariable} environment variable to extract bearer.`,
+        )
     }
     const authHeader = req.headers.authorization
     if (!authHeader?.startsWith('Bearer ')) {
